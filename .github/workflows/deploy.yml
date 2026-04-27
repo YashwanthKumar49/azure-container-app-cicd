@@ -1,0 +1,43 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: html-app
+  REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Login to ACR
+      run: |
+        az acr login --name $(echo $REGISTRY | cut -d'.' -f1)
+
+    - name: Build image
+      run: |
+        docker build -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+
+    - name: Push image
+      run: |
+        docker push $REGISTRY/$IMAGE_NAME:${{ github.sha }}
+
+    - name: Deploy to Container App
+      run: |
+        az containerapp update \
+          --name yash-cont-app \
+          --resource-group test-rg \
+          --image $REGISTRY/$IMAGE_NAME:${{ github.sha }}
